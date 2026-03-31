@@ -613,8 +613,49 @@ html, body, [class*="css"], .stApp {
     margin-bottom: 12px;
     display: flex;
     align-items: center;
+    display: flex;
+    align-items: center;
     gap: 8px;
 }
+
+/* ── CLINICAL MICRONUTRIENTS ── */
+.micro-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 16px;
+}
+.micro-chip {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    padding: 10px 14px;
+    flex: 1 1 140px;
+}
+.micro-name { font-size: 0.7rem; color: #8080A0; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.micro-val { font-size: 1rem; font-weight: 700; color: white; display: flex; align-items: baseline; gap: 4px; }
+.micro-unit { font-size: 0.65rem; color: #505070; }
+.micro-bar { height: 3px; background: rgba(255,255,255,0.05); border-radius: 100px; margin-top: 8px; overflow: hidden; }
+.micro-fill { height: 100%; background: #7C3AED; }
+
+/* ── SOCIAL PULSE LEADERBOARD ── */
+.leaderboard-card {
+    background: linear-gradient(135deg, rgba(124,58,237,0.05), rgba(0,0,0,0));
+    border: 1px solid rgba(124,58,237,0.15);
+    border-radius: 20px;
+    padding: 24px;
+}
+.board-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.board-user { display: flex; align-items: center; gap: 12px; }
+.board-rank { font-weight: 800; color: #7C3AED; width: 24px; }
+.board-name { font-weight: 500; font-size: 0.95rem; }
+.board-score { font-family: 'Sora', sans-serif; font-weight: 700; color: #10B981; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -633,7 +674,10 @@ if 'history' not in st.session_state:
     st.session_state.history = []
 
 if 'daily_totals' not in st.session_state:
-    st.session_state.daily_totals = {'calories': 0, 'protein': 0, 'fiber': 0}
+    st.session_state.daily_totals = {
+        'calories': 0, 'protein': 0, 'fiber': 0, 
+        'vitamin_a': 0, 'vitamin_c': 0, 'iron': 0, 'calcium': 0
+    }
 
 # --- HELPER: LOTTIE & JSON ---
 @st.cache_data
@@ -905,6 +949,15 @@ if img_to_process:
                     "kitchen_intelligence": {
                         "hack_name": "Healthy Alternative Name",
                         "instructions": ["Step 1", "Step 2", "Step 3"]
+                    },
+                    "micronutrients": {
+                        "vitamin_a": {"val": "150", "unit": "mcg", "pct": 20},
+                        "vitamin_c": {"val": "45", "unit": "mg", "pct": 50},
+                        "vitamin_d": {"val": "5", "unit": "mcg", "pct": 10},
+                        "vitamin_b12": {"val": "0.5", "unit": "mcg", "pct": 15},
+                        "iron": {"val": "8", "unit": "mg", "pct": 40},
+                        "calcium": {"val": "200", "unit": "mg", "pct": 20},
+                        "zinc": {"val": "3", "unit": "mg", "pct": 25}
                     }
                 }
                 """
@@ -935,13 +988,18 @@ if img_to_process:
                 st.session_state.history.append(analysis)
                 st.session_state.daily_totals['calories'] += analysis.get('total_calories', 0)
                 
-                # Macro parsing (stripping 'g', converting to float)
-                def clean_float(val): return float(str(val).replace('g','').replace('mg',''))
+                # Macro & Micro parsing (stripping units, converting to float)
+                def c_f(val): return float(str(val).replace('g','').replace('mg','').replace('mcg',''))
                 try:
                     m = analysis.get('macros', {})
-                    st.session_state.daily_totals['protein'] += clean_float(m.get('protein', {}).get('amount', 0))
-                    st.session_state.daily_totals['fiber'] += clean_float(m.get('fiber', {}).get('amount', 0))
-                except: pass
+                    st.session_state.daily_totals['protein'] += c_f(m.get('protein', {}).get('amount', 0))
+                    st.session_state.daily_totals['fiber'] += c_f(m.get('fiber', {}).get('amount', 0))
+                    
+                    mic = analysis.get('micronutrients', {})
+                    for key in ['vitamin_a', 'vitamin_c', 'iron', 'calcium']:
+                        st.session_state.daily_totals[key] += c_f(mic.get(key, {}).get('val', 0))
+                except Exception as e: 
+                    st.warning(f"Metadata parsing skipped: {e}")
                 
                 # Render results Act 3 logic
                 r1c1, r1c2, r1c3 = st.columns([1, 1, 1.3])
@@ -1032,6 +1090,22 @@ if img_to_process:
                     )
                     st.plotly_chart(fig, use_container_width=True)
                     st.markdown('</div>', unsafe_allow_html=True)
+
+                # --- NEW: ACT 7 - THE MICRONUTRIENT VAULT ---
+                st.markdown('<p class="card-label">Micronutrient Vault</p>', unsafe_allow_html=True)
+                st.markdown('<div class="card">', unsafe_allow_html=True)
+                mic = analysis.get('micronutrients', {})
+                st.markdown('<div class="micro-grid">', unsafe_allow_html=True)
+                for nutrient, data in mic.items():
+                    n_display = nutrient.replace('vitamin_', 'Vit ').replace('b12', 'B12').capitalize()
+                    st.markdown(f"""
+                    <div class="micro-chip">
+                        <div class="micro-name">{n_display}</div>
+                        <div class="micro-val">{data.get('val')}<span class="micro-unit">{data.get('unit')}</span></div>
+                        <div class="micro-bar"><div class="micro-fill" style="width:{data.get('pct')}%"></div></div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                st.markdown('</div></div>', unsafe_allow_html=True)
 
                 # --- INSIGHTS SECTION ---
                 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
@@ -1137,6 +1211,59 @@ with tab3:
             except Exception as e: st.error(str(e))
 
 st.markdown('<div class="section-divider" style="margin: 60px 0;"></div>', unsafe_allow_html=True)
+
+# --- ACT 8: THE SOCIAL PULSE (LEADERBOARD) ---
+st.markdown('<p class="section-label">Act 08</p>', unsafe_allow_html=True)
+st.markdown('<h2 class="section-title">The Social Pulse</h2>', unsafe_allow_html=True)
+st.markdown(f'<p class="section-desc">See how your nutritional intelligence ranks in <strong>{st.session_state.user_profile["region"]}</strong>.</p>', unsafe_allow_html=True)
+
+social_col1, social_col2 = st.columns([2, 1])
+
+with social_col1:
+    st.markdown('<div class="leaderboard-card">', unsafe_allow_html=True)
+    st.markdown('<div style="font-family:Sora; font-weight:700; margin-bottom:20px;">🏆 Regional Leaderboard</div>', unsafe_allow_html=True)
+    
+    mock_users = [
+        {"rank": 1, "name": "Aditya V.", "score": 985, "badge": "🔥 14d Streak"},
+        {"rank": 2, "name": "Priya S.", "score": 942, "badge": "🥗 Fiber King"},
+        {"rank": 3, "name": "Eshwar (You)", "score": 880, "badge": "⚡ Rising Star"},
+        {"rank": 4, "name": "Rahul M.", "score": 810, "badge": "🍗 Protein Max"},
+    ]
+    
+    for u in mock_users:
+        is_you = "(You)" in u['name']
+        st.markdown(f"""
+        <div class="board-row" style="{'background:rgba(124,58,237,0.1); border-radius:8px; padding-left:10px;' if is_you else ''}">
+            <div class="board-user">
+                <span class="board-rank">#{u['rank']}</span>
+                <div>
+                    <div class="board-name">{u['name']}</div>
+                    <div style="font-size:0.7rem; color:#505070;">{u['badge']}</div>
+                </div>
+            </div>
+            <div class="board-score">{u['score']} pts</div>
+        </div>
+        """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with social_col2:
+    st.markdown('<div class="card" style="height:100%; display:flex; flex-direction:column; justify-content:center; text-align:center;">', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:2.5rem; margin-bottom:10px;">🔥</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-family:Sora; font-weight:700; font-size:1.2rem;">3 Day Streak!</div>', unsafe_allow_html=True)
+    st.markdown('<p style="font-size:0.8rem; color:#8080A0;">Log one more healthy meal to hit a 4-day milestone.</p>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# --- ACT 9: DAILY ARCHITECT REPORT (EXPORT) ---
+if st.session_state.history:
+    st.markdown('<div class="section-divider" style="margin: 40px 0;"></div>', unsafe_allow_html=True)
+    ecol1, ecol2 = st.columns([2, 1])
+    with ecol1:
+        st.markdown("### Handcrafted for you.")
+        st.markdown(f"Consolidate your **{len(st.session_state.history)} meals** into a premium health diagnostic.")
+    with ecol2:
+        if st.button("📊 GENERATE DAILY REPORT", use_container_width=True):
+            st.balloons()
+            st.success("Report Compiled! Ready for your clinician.")
 
 # --- ACT 6: YOUR LIFE LOG ---
 if st.session_state.history:
