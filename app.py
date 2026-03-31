@@ -656,6 +656,25 @@ html, body, [class*="css"], .stApp {
 .board-rank { font-weight: 800; color: #7C3AED; width: 24px; }
 .board-name { font-weight: 500; font-size: 0.95rem; }
 .board-score { font-family: 'Sora', sans-serif; font-weight: 700; color: #10B981; }
+
+/* ── SIDEBAR ANALYTICS DASHBOARD ── */
+.sb-title { font-family: 'Sora', sans-serif; font-weight: 700; color: #A78BFA; font-size: 1.1rem; margin-bottom: 20px; }
+.sb-stat-cluster { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 15px; margin-bottom: 12px; }
+.sb-stat-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+.sb-stat-label { font-size: 0.7rem; color: #8080A0; font-weight: 500; }
+.sb-stat-val { font-size: 0.8rem; font-weight: 700; color: white; }
+.sb-spark { height: 2px; width: 100%; background: rgba(255,255,255,0.05); border-radius: 10; margin: 10px 0; overflow: hidden; }
+.sb-spark-fill { height: 100%; background: #10B981; }
+
+/* ── 3D INGREDIENT FLIP CARDS ── */
+.ingredient-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; perspective: 1000px; }
+.flip-card { width: 120px; height: 160px; transition: transform 0.6s; transform-style: preserve-3d; cursor: pointer; position: relative; }
+.flip-card:hover { transform: rotateY(180deg); }
+.flip-card-front, .flip-card-back { position: absolute; width: 100%; height: 100%; backface-visibility: hidden; border-radius: 12px; padding: 12px; border: 1px solid rgba(255,255,255,0.08); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.flip-card-front { background: rgba(0,0,0,0.3); }
+.flip-card-back { background: #7C3AED22; transform: rotateY(180deg); font-size: 0.65rem; color: #D8B4FE; font-weight: 600; }
+.ing-emoji { font-size: 1.5rem; margin-bottom: 8px; }
+.ing-name { font-size: 0.75rem; font-weight: 700; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -717,6 +736,27 @@ with st.sidebar:
     
     if st.session_state.demo_mode_active:
         st.markdown(f'<div style="text-align:center; color:#10B981; font-size:0.8rem; margin-bottom:10px;"><span class="pulse-green"></span>Demo Mode Activated</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="sb-title">Nourish Dashboard</div>', unsafe_allow_html=True)
+    
+    # --- SIDEBAR ANALYTICS CLUSTER ---
+    st.markdown(f"""
+    <div class="sb-stat-cluster">
+        <div class="sb-stat-row">
+            <span class="sb-stat-label">3d Nourish Streak</span>
+            <span class="sb-stat-val" style="color:#FBBF24;">🔥 3 Days</span>
+        </div>
+        <div class="sb-spark"><div class="sb-spark-fill" style="width:40%"></div></div>
+        <div class="sb-stat-row">
+            <span class="sb-stat-label">Regional Rank</span>
+            <span class="sb-stat-val">#3 {st.session_state.user_profile['region']}</span>
+        </div>
+        <div class="sb-stat-row">
+            <span class="sb-stat-label">Metabolic Health</span>
+            <span class="sb-stat-val" style="color:#10B981;">Strong</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     # ── PROFILE HEADER ──
     p_name = st.session_state.user_profile.get('name', 'Your Profile')
@@ -952,13 +992,13 @@ if img_to_process:
                     },
                     "micronutrients": {
                         "vitamin_a": {"val": "150", "unit": "mcg", "pct": 20},
-                        "vitamin_c": {"val": "45", "unit": "mg", "pct": 50},
-                        "vitamin_d": {"val": "5", "unit": "mcg", "pct": 10},
-                        "vitamin_b12": {"val": "0.5", "unit": "mcg", "pct": 15},
-                        "iron": {"val": "8", "unit": "mg", "pct": 40},
-                        "calcium": {"val": "200", "unit": "mg", "pct": 20},
-                        "zinc": {"val": "3", "unit": "mg", "pct": 25}
-                    }
+                        "vitamin_c": {"val": "45", "unit": "mg", "pct": 50}
+                    },
+                    "metabolic_curve": [80, 95, 110, 105, 90, 85],
+                    "ingredient_powers": [
+                        {"name": "Turmeric", "emoji": "🫚", "power": "Anti-inflammatory & Anti-oxidant"},
+                        {"name": "Lentils", "emoji": "🫘", "power": "Slow-release sustained energy"}
+                    ]
                 }
                 """
                 # --- Visual Feedback: Lottie Animation ---
@@ -1106,6 +1146,35 @@ if img_to_process:
                     </div>
                     """, unsafe_allow_html=True)
                 st.markdown('</div></div>', unsafe_allow_html=True)
+                
+                # --- NEW: ACT 10 - METABOLIC INSIGHT (GLUCOSE CURVE) ---
+                st.markdown('<p class="card-label">Metabolic Insight (AI Predicted)</p>', unsafe_allow_html=True)
+                st.markdown('<div class="card">', unsafe_allow_html=True)
+                curve = analysis.get('metabolic_curve', [100, 100, 100, 100, 100, 100])
+                times = ["Meal", "30m", "60m", "90m", "2h", "4h"]
+                
+                fig2 = go.Figure()
+                fig2.add_trace(go.Scatter(x=times, y=curve, mode='lines+markers', line=dict(color='#10B981', width=3), fill='tozeroy', fillcolor='rgba(16, 185, 129, 0.1)'))
+                fig2.update_layout(height=180, margin=dict(l=0,r=0,t=10,b=0), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', showlegend=False, xaxis=dict(visible=True, showgrid=False, color='#505070'), yaxis=dict(visible=False, showgrid=False))
+                st.plotly_chart(fig2, use_container_width=True)
+                st.markdown('<div style="font-size:0.7rem; color:#8080A0; text-align:center;">Projected Energy & Glucose Response</div>', unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
+
+                # --- NEW: 3D INGREDIENT FLIP CARDS ---
+                st.markdown('<div class="ingredient-grid">', unsafe_allow_html=True)
+                for ing in analysis.get('ingredient_powers', []):
+                    st.markdown(f"""
+                    <div class="flip-card">
+                        <div class="flip-card-front">
+                            <div class="ing-emoji">{ing.get('emoji')}</div>
+                            <div class="ing-name">{ing.get('name')}</div>
+                        </div>
+                        <div class="flip-card-back">
+                            {ing.get('power')}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                st.markdown('</div>', unsafe_allow_html=True)
 
                 # --- INSIGHTS SECTION ---
                 st.markdown('<div class="section-divider"></div>', unsafe_allow_html=True)
@@ -1208,6 +1277,24 @@ with tab3:
                         </div>
                         """, unsafe_allow_html=True)
                 st.success(f"Full Day Investment: ₹{thali_data.get('total_cost')}")
+            except Exception as e: st.error(str(e))
+
+tab4 = st.tabs(["🧪 Leftover Alchemist"])[0]
+with tab4:
+    ingredients = st.text_input("What's in your fridge? (comma separated):", placeholder="e.g. Bread, Paneer, 1 Tomato")
+    if st.button("Transmute to Healthy Meal"):
+        with st.spinner("AI Alchemy in progress..."):
+            prompt = get_system_prompt() + f"TASK: Create a healthy meal from {ingredients}. Return JSON {{'dish', 'recipe', 'why_save'}}"
+            try:
+                out = client.models.generate_content(model='gemini-2.5-flash', contents=prompt).text
+                alc = extract_json(out)
+                st.markdown(f"""
+                <div class="card" style="border-left: 4px solid #10B981;">
+                    <h3 style="color:#10B981;">✨ {alc.get('dish')}</h3>
+                    <p style="font-size:0.8rem; margin-bottom:15px;">{alc.get('recipe')}</p>
+                    <div style="font-size:0.75rem; color:#8080A0;"><strong>Impact:</strong> {alc.get('why_save')}</div>
+                </div>
+                """, unsafe_allow_html=True)
             except Exception as e: st.error(str(e))
 
 st.markdown('<div class="section-divider" style="margin: 60px 0;"></div>', unsafe_allow_html=True)
