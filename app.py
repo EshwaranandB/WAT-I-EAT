@@ -26,11 +26,13 @@ st.markdown("""
 
 # --- LOAD ENV & CONFIG GEMINI ---
 load_dotenv()
-api_key = os.getenv("GOOGLE_API_KEY")
+# Check local .env first, then Streamlit Secrets for cloud deployment
+api_key = os.getenv("GOOGLE_API_KEY") or st.secrets.get("GOOGLE_API_KEY")
+
 if api_key:
     client = genai.Client(api_key=api_key)
 else:
-    st.error("Google API Key not found. Please set GOOGLE_API_KEY in your .env file.")
+    st.error("Google API Key not found. Please set GOOGLE_API_KEY in your .env file or Streamlit Secrets.")
     client = None
 
 # --- NUCLEAR CSS OVERHAUL ---
