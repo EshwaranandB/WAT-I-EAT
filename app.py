@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 from PIL import Image
 import io
 import plotly.graph_objects as go
+from streamlit_lottie import st_lottie
+import requests
 
 # --- PAGE CONFIG ---
 st.set_page_config(
@@ -579,6 +581,40 @@ html, body, [class*="css"], .stApp {
 }
 .footer-tagline { font-size: 0.9rem; color: #3A3A5C; margin-bottom: 24px; }
 .footer-copy { font-size: 0.75rem; color: #2A2A40; margin-top: 24px; }
+/* ── PROGRESS RINGS (DAILY) ── */
+.daily-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+    margin: 40px 0;
+}
+.pulsing-status {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #10B981;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 12px;
+}
+/* ── KITCHEN INTELLIGENCE ── */
+.kitchen-hack {
+    background: rgba(124,58,237,0.05);
+    border: 1px solid rgba(124,58,237,0.15);
+    border-radius: 16px;
+    padding: 20px;
+    margin-top: 20px;
+}
+.kitchen-hack-title {
+    font-family: 'Sora', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    color: #A78BFA;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -593,7 +629,22 @@ if 'user_profile' not in st.session_state:
 if 'demo_mode_active' not in st.session_state:
     st.session_state.demo_mode_active = False
 
-# --- HELPER: JSON EXTRACTOR ---
+if 'history' not in st.session_state:
+    st.session_state.history = []
+
+if 'daily_totals' not in st.session_state:
+    st.session_state.daily_totals = {'calories': 0, 'protein': 0, 'fiber': 0}
+
+# --- HELPER: LOTTIE & JSON ---
+@st.cache_data
+def load_lottieurl(url: str):
+    r = requests.get(url)
+    if r.status_code != 200: return None
+    return r.json()
+
+lottie_scanning = load_lottieurl("https://assets5.lottiefiles.com/packages/lf20_96bovdur.json") # Food scan animation
+lottie_success = load_lottieurl("https://assets10.lottiefiles.com/packages/lf20_n9u8vyqc.json") # Success check
+
 def extract_json(text):
     text = text.strip()
     if text.startswith("```json"):
@@ -698,6 +749,57 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# --- ACT 1.5: THE HEALTH PULSE (DAILY TRACKING) ---
+if st.session_state.history:
+    st.markdown('<p class="section-label" style="text-align:center;">Act 1.5</p>', unsafe_allow_html=True)
+    st.markdown('<h2 class="section-title" style="text-align:center;">The Health Pulse</h2>', unsafe_allow_html=True)
+    st.markdown('<p class="section-desc" style="text-align:center; margin: 0 auto 40px;">Real-time tracking of your cumulative nutritional footprint today.</p>', unsafe_allow_html=True)
+    
+    st.markdown('<div class="daily-grid">', unsafe_allow_html=True)
+    p_col1, p_col2, p_col3 = st.columns(3)
+    
+    with p_col1:
+        # Calorie Ring
+        cal_pct = min(st.session_state.daily_totals['calories'] / 2000 * 100, 100)
+        st.markdown(f"""
+        <div class="score-ring-wrapper card">
+            <div class="score-ring" style="--ring-color:#7C3AED; --ring-deg:{int(cal_pct*3.6)}deg;">
+                <div class="score-ring-value">{int(st.session_state.daily_totals['calories'])}</div>
+            </div>
+            <div class="score-ring-label">Calories Eaten</div>
+            <div style="font-size:0.75rem; color:#505070; margin-top:10px;">Goal: 2000 kcal</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with p_col2:
+        # Protein Ring
+        prot_pct = min(st.session_state.daily_totals['protein'] / 100 * 100, 100)
+        st.markdown(f"""
+        <div class="score-ring-wrapper card">
+            <div class="score-ring" style="--ring-color:#DB2777; --ring-deg:{int(prot_pct*3.6)}deg;">
+                <div class="score-ring-value">{int(st.session_state.daily_totals['protein'])}g</div>
+            </div>
+            <div class="score-ring-label">Protein Target</div>
+            <div style="font-size:0.75rem; color:#505070; margin-top:10px;">Goal: 100g</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with p_col3:
+        # Fiber Ring
+        fib_pct = min(st.session_state.daily_totals['fiber'] / 30 * 100, 100)
+        st.markdown(f"""
+        <div class="score-ring-wrapper card">
+            <div class="score-ring" style="--ring-color:#10B981; --ring-deg:{int(fib_pct*3.6)}deg;">
+                <div class="score-ring-value">{int(st.session_state.daily_totals['fiber'])}g</div>
+            </div>
+            <div class="score-ring-label">Fiber Count</div>
+            <div style="font-size:0.75rem; color:#505070; margin-top:10px;">Goal: 30g</div>
+        </div>
+        """, unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown('<div class="section-divider" style="margin: 40px 0;"></div>', unsafe_allow_html=True)
+
 # --- PROMPT BUILDER ---
 def get_system_prompt():
     p = st.session_state.user_profile
@@ -799,14 +901,26 @@ if img_to_process:
                         "protein": 7, "carbs": 4, "fats": 6, "vitamins": 8, "minerals": 5, "hydration": 3
                     },
                     "personality": "Impactful Eater",
-                    "habit": "Start your day with half a liter of water before this meal."
+                    "habit": "Start your day with half a liter of water before this meal.",
+                    "kitchen_intelligence": {
+                        "hack_name": "Healthy Alternative Name",
+                        "instructions": ["Step 1", "Step 2", "Step 3"]
+                    }
                 }
                 """
+                # --- Visual Feedback: Lottie Animation ---
+                lottie_placeholder = st.empty()
+                with lottie_placeholder:
+                    if lottie_scanning:
+                        st_lottie(lottie_scanning, height=300, key="scanning")
+                    else:
+                        st.info("AI Vision System Initialization...")
+                
                 # Convert PIL to bytes
                 buf = io.BytesIO()
                 pil_image.save(buf, format="JPEG")
                 img_bytes = buf.getvalue()
-
+                
                 response = client.models.generate_content(
                     model='gemini-2.5-flash',
                     contents=[
@@ -815,6 +929,19 @@ if img_to_process:
                     ]
                 )
                 analysis = extract_json(response.text)
+                lottie_placeholder.empty()
+                
+                # Update Session History & Daily Totals
+                st.session_state.history.append(analysis)
+                st.session_state.daily_totals['calories'] += analysis.get('total_calories', 0)
+                
+                # Macro parsing (stripping 'g', converting to float)
+                def clean_float(val): return float(str(val).replace('g','').replace('mg',''))
+                try:
+                    m = analysis.get('macros', {})
+                    st.session_state.daily_totals['protein'] += clean_float(m.get('protein', {}).get('amount', 0))
+                    st.session_state.daily_totals['fiber'] += clean_float(m.get('fiber', {}).get('amount', 0))
+                except: pass
                 
                 # Render results Act 3 logic
                 r1c1, r1c2, r1c3 = st.columns([1, 1, 1.3])
@@ -848,6 +975,24 @@ if img_to_process:
                     st.markdown(f'<div class="verdict-tag verdict-good">✅ {v.get("great")}</div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="verdict-tag verdict-warn">⚠️ {v.get("watch_out")}</div>', unsafe_allow_html=True)
                     st.markdown(f'<div class="verdict-tag verdict-swap">💡 {v.get("swap_suggestion")}</div>', unsafe_allow_html=True)
+                    
+                    # --- NEW: KITCHEN INTELLIGENCE (AI RECIPE HACK) ---
+                    if analysis.get('nourish_score', 100) < 75:
+                        hack = analysis.get('kitchen_intelligence', {})
+                        if hack:
+                            st.markdown(f"""
+                            <div class="kitchen-hack">
+                                <div class="kitchen-hack-title">
+                                    ✨ Kitchen Intel: Healthy Alternative
+                                </div>
+                                <div style="font-size:1.1rem; font-weight:600; color:white; margin-bottom:8px;">
+                                    {hack.get('hack_name', 'Healthy Version')}
+                                </div>
+                                <div style="margin-top:8px;">
+                                    {" ".join([f'<div style="font-size:0.8rem; color:#8080A0; margin-bottom:4px;">• {step}</div>' for step in hack.get('instructions', [])])}
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
                     st.markdown('</div>', unsafe_allow_html=True)
                 
                 r2c1, r2c2 = st.columns([1.5, 1])
@@ -991,6 +1136,34 @@ with tab3:
                 st.success(f"Full Day Investment: ₹{thali_data.get('total_cost')}")
             except Exception as e: st.error(str(e))
 
+st.markdown('<div class="section-divider" style="margin: 60px 0;"></div>', unsafe_allow_html=True)
+
+# --- ACT 6: YOUR LIFE LOG ---
+if st.session_state.history:
+    st.markdown('<p class="section-label" style="text-align:center;">Act 06</p>', unsafe_allow_html=True)
+    st.markdown('<h2 class="section-title" style="text-align:center;">Your Life Log</h2>', unsafe_allow_html=True)
+    st.markdown('<p class="section-desc" style="text-align:center; margin: 0 auto 40px;">A chronological history of your nutritional footprint.</p>', unsafe_allow_html=True)
+    
+    # Chronological history cards
+    for i, item in enumerate(reversed(st.session_state.history)):
+        meal_name = item.get('food_identified', [{}])[0].get('name', 'Unknown Meal')
+        score = item.get('nourish_score', 0)
+        c_color = "#10B981" if score > 70 else ("#FBBF24" if score > 40 else "#EF4444")
+        
+        with st.expander(f"Meal {len(st.session_state.history)-i}: {meal_name} (Score: {score})"):
+            l_col1, l_col2 = st.columns([1, 2])
+            with l_col1:
+                st.markdown(f"""
+                <div class="card" style="text-align:center; padding:15px; border-color:{c_color};">
+                    <h2 style="color:{c_color};">{score}</h2>
+                    <p style="font-size:0.7rem; color:#8080A0;">NourishScore</p>
+                </div>
+                """, unsafe_allow_html=True)
+            with l_col2:
+                st.markdown(f"**Energy:** {item.get('total_calories')} kcal")
+                st.markdown(f"**The Good:** {item.get('verdict', {}).get('great')}")
+                st.markdown(f"**Action:** {item.get('verdict', {}).get('swap_suggestion')}")
+
 # --- ACT 5: VISION FOOTER ---
 st.markdown(f"""
 <div class="footer">
@@ -999,7 +1172,7 @@ st.markdown(f"""
         Making healthy eating possible for every Indian
     </div>
     <div style="display: flex; justify-content: center; flex-wrap: wrap;">
-        <span class="powered-badge">⚡ Google Gemini 2.0 Flash</span>
+        <span class="powered-badge">⚡ Google Gemini 2.5 Flash</span>
         <span class="powered-badge">🔴 AMD AI Inference</span>
         <span class="powered-badge">🇮🇳 Built for India</span>
     </div>
